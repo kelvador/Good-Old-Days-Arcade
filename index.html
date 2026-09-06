@@ -316,6 +316,7 @@
     let selectPulse = 0;
     let touchActive = false;
     let touchX = GAME_WIDTH / 2;
+    let touchY = GAME_HEIGHT / 2;
 
     function viewportSize() {
       const vv = window.visualViewport;
@@ -1357,12 +1358,7 @@
       daysTheme.pause();
     }
 
-    function returnToMenu() {
-      started = false;
-      introActive = false;
-      revengeActive = false;
-      revengeDone = false;
-      gameOver = false;
+    function clearRunState() {
       victory = false;
       victoryTimer = 0;
       finalBossActive = false;
@@ -1385,7 +1381,6 @@
       invulnTimer = 0;
       bannerText = "";
       bannerTimer = 0;
-      lives = STARTING_LIVES;
       bullets.length = 0;
       enemyBullets.length = 0;
       enemies.length = 0;
@@ -1393,7 +1388,35 @@
       pickups.length = 0;
       touchActive = false;
       for (const code in keys) keys[code] = false;
+    }
+
+    function returnToMenu() {
+      started = false;
+      introActive = false;
+      revengeActive = false;
+      revengeDone = false;
+      gameOver = false;
+      clearRunState();
+      lives = STARTING_LIVES;
       if (daysUnlocked) selectIndex = 2;
+      resetShip();
+    }
+
+    function restartSameShip() {
+      if (!selectedShip || selectedShip.locked || selectedShip.id === "days") {
+        returnToMenu();
+        return;
+      }
+      clearRunState();
+      gameOver = false;
+      introActive = false;
+      revengeActive = false;
+      started = true;
+      shipW = selectedShip.width;
+      shipH = selectedShip.height;
+      shipSpeed = selectedShip.speed;
+      shipColor = selectedShip.color;
+      lives = selectedShip.lives;
       resetShip();
     }
 
@@ -1415,6 +1438,27 @@
         w,
         h
       };
+    }
+
+    function gameOverButtonRects() {
+      const w = 240;
+      const h = 48;
+      const x = (canvas.width - w) / 2;
+      return {
+        again: { x, y: canvas.height / 2 + 28, w, h },
+        menu: { x, y: canvas.height / 2 + 88, w, h }
+      };
+    }
+
+    function hitRect(pt, r) {
+      return pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
+    }
+
+    function handleGameOverAt(pt) {
+      if (!gameOver) return;
+      const btns = gameOverButtonRects();
+      if (hitRect(pt, btns.again)) restartSameShip();
+      else if (hitRect(pt, btns.menu)) returnToMenu();
     }
 
     function triggerVictory(x, y) {
@@ -1521,7 +1565,7 @@
       ship.vy = ay * shipSpeed;
       if (touchActive) {
         ship.x = touchX;
-        ship.y += ship.vy * dt;
+        ship.y = touchY;
       } else {
         ship.x += ship.vx * dt;
         ship.y += ship.vy * dt;
@@ -1995,6 +2039,7 @@
       const pt = readTouchPoint(event);
       if (!pt) return;
       touchX = pt.x;
+      touchY = pt.y;
       if (revengeActive) {
         handleRevengeAt(pt);
         return;
@@ -2007,7 +2052,11 @@
         handleSelectAt(pt);
         return;
       }
-      if (gameOver || victory) return;
+      if (gameOver) {
+        handleGameOverAt(pt);
+        return;
+      }
+      if (victory) return;
       touchActive = true;
     }
 
@@ -2016,6 +2065,7 @@
       const pt = readTouchPoint(event);
       if (!pt) return;
       touchX = pt.x;
+      touchY = pt.y;
       if (started && !gameOver && !victory) touchActive = true;
     }
 
@@ -2024,6 +2074,7 @@
       if (event.touches && event.touches.length > 0) {
         const pt = clientToCanvas(event.touches[0].clientX, event.touches[0].clientY);
         touchX = pt.x;
+        touchY = pt.y;
         return;
       }
       touchActive = false;
@@ -2546,13 +2597,56 @@
       }
     }
 
-    function drawGameOver() {
-      if (!gameOver) return;
-      ctx.fillStyle = "#ff0000";
-      ctx.font = "bold 72px system-ui, sans-serif";
+    function drawArcadeButton(rect, label) {
+      ctx.save();
+      ctx.fillStyle = "rgba(12, 10, 18, 0.92)";
+      ctx.strokeStyle = "rgba(255, 214, 10, 0.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10);
+      else ctx.rect(rect.x, rect.y, rect.w, rect.h);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ffd60a";
+      ctx.font = "bold 16px " + INTRO_FONT;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+      ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+      ctx.restore();
+    }
+
+    function drawGameOver() {
+      if (!gameOver) return;
+      ctx.save();
+      ctx.fillStyle = "rgba(0, 4, 12, 0.62)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const panelW = 420;
+      const panelH = 280;
+      const px = (canvas.width - panelW) / 2;
+      const py = canvas.height / 2 - 150;
+      ctx.fillStyle = "rgba(8, 10, 20, 0.94)";
+      ctx.strokeStyle = "#ffd60a";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(px, py, panelW, panelH, 14);
+      else ctx.rect(px, py, panelW, panelH);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ff2d55";
+      ctx.font = "bold 42px " + INTRO_FONT;
+      ctx.fillText("GAME OVER", canvas.width / 2, py + 58);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "16px " + INTRO_FONT;
+      ctx.fillText("Skor: " + score, canvas.width / 2, py + 100);
+
+      const btns = gameOverButtonRects();
+      ctx.restore();
+      drawArcadeButton(btns.again, "PLAY AGAIN");
+      drawArcadeButton(btns.menu, "MAIN MENU");
     }
 
     function drawVictory() {
@@ -2830,7 +2924,17 @@
         else if (event.code === "Enter" || event.code === "Space") confirmSelect();
         return;
       }
-      if (gameOver || victory) return;
+      if (victory) return;
+      if (gameOver) {
+        if (event.code === "Enter" || event.code === "Space") {
+          event.preventDefault();
+          restartSameShip();
+        } else if (event.code === "Escape" || event.code === "KeyM") {
+          event.preventDefault();
+          returnToMenu();
+        }
+        return;
+      }
       keys[event.code] = true;
       if (
         event.code === "Space" ||
@@ -2858,6 +2962,10 @@
       if (event.pointerType === "touch") return;
       if (revengeActive) {
         handleRevengePointer(event);
+        return;
+      }
+      if (gameOver) {
+        handleGameOverAt(canvasPoint(event));
         return;
       }
       if (!started && !introActive) handleSelectPointer(event);
