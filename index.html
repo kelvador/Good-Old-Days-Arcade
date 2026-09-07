@@ -317,6 +317,7 @@
     let touchActive = false;
     let touchX = GAME_WIDTH / 2;
     let touchY = GAME_HEIGHT / 2;
+    const TOUCH_Y_OFFSET = 60;
 
     function viewportSize() {
       const vv = window.visualViewport;
@@ -1565,7 +1566,7 @@
       ship.vy = ay * shipSpeed;
       if (touchActive) {
         ship.x = touchX;
-        ship.y = touchY;
+        ship.y = touchY - TOUCH_Y_OFFSET;
       } else {
         ship.x += ship.vx * dt;
         ship.y += ship.vy * dt;
